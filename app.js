@@ -229,9 +229,10 @@ class CardGrader {
         
         this.showDetailBreakdown(frontScores, backScores);
         
-        // Generate and show full report
-        this.generateFullReport(frontScores, backScores, combinedScores, grade);
+        // Store scores for report generation after card selection
+        this.lastAnalysis = { frontScores, backScores, combinedScores, grade };
         
+        // Show card search first
         this.showCardSearch();
         
         loading?.classList.add('hidden');
@@ -691,6 +692,16 @@ class CardGrader {
         }
         
         document.getElementById('card-search')?.remove();
+        
+        // Generate full report after card is selected
+        if (this.lastAnalysis) {
+            this.generateFullReport(
+                this.lastAnalysis.frontScores, 
+                this.lastAnalysis.backScores, 
+                this.lastAnalysis.combinedScores, 
+                this.lastAnalysis.grade
+            );
+        }
     }
     
     saveResult() {
