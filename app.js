@@ -120,15 +120,88 @@ class CardGrader {
     async analyzeBoth() {
         const loading = document.getElementById('loading');
         loading?.classList.remove('hidden');
-        if (loading) loading.querySelector('p').textContent = 'Menganalisis sisi depan...';
+        const loadingText = loading?.querySelector('p');
+        
+        // Step 1: Load images
+        if (loadingText) loadingText.textContent = '📸 Memuat gambar...';
+        await this.delay(800);
         
         const frontImg = await this.loadImage(this.frontImage);
-        const frontScores = this.analyzeStable(frontImg);
-        
-        if (loading) loading.querySelector('p').textContent = 'Menganalisis sisi belakang...';
-        
         const backImg = await this.loadImage(this.backImage);
-        const backScores = this.analyzeStable(backImg);
+        
+        // Step 2: Preprocessing
+        if (loadingText) loadingText.textContent = '🔧 Preprocessing gambar (blur noise reduction)...';
+        await this.delay(1200);
+        
+        // Step 3: Analyze FRONT - Centering
+        if (loadingText) loadingText.textContent = '📏 Analisis CENTERING sisi depan...';
+        await this.delay(1000);
+        const frontCentering = this.checkCentering(await this.getImageData(frontImg), 500, Math.floor(500 * frontImg.height / frontImg.width));
+        
+        // Step 4: Analyze FRONT - Surface
+        if (loadingText) loadingText.textContent = '🔍 Analisis SURFACE sisi depan (scratches/print lines)...';
+        await this.delay(1200);
+        const frontSurface = this.checkSurface(await this.getImageData(frontImg), 500, Math.floor(500 * frontImg.height / frontImg.width));
+        
+        // Step 5: Analyze FRONT - Corners
+        if (loadingText) loadingText.textContent = '📐 Analisis CORNERS sisi depan (whitening/damage)...';
+        await this.delay(1000);
+        const frontCorners = this.checkCorners(await this.getImageData(frontImg), 500, Math.floor(500 * frontImg.height / frontImg.width));
+        
+        // Step 6: Analyze FRONT - Edges
+        if (loadingText) loadingText.textContent = '📎 Analisis EDGES sisi depan (wear/chipping)...';
+        await this.delay(1000);
+        const frontEdges = this.checkEdges(await this.getImageData(frontImg), 500, Math.floor(500 * frontImg.height / frontImg.width));
+        
+        // Step 7: Analyze FRONT - Lighting
+        if (loadingText) loadingText.textContent = '💡 Analisis LIGHTING sisi depan...';
+        await this.delay(800);
+        const frontLighting = this.checkLighting(await this.getImageData(frontImg), 500, Math.floor(500 * frontImg.height / frontImg.width));
+        
+        const frontScores = {
+            centering: frontCentering,
+            surface: frontSurface,
+            corners: frontCorners,
+            edges: frontEdges,
+            lighting: frontLighting
+        };
+        
+        // Step 8: Analyze BACK - Centering
+        if (loadingText) loadingText.textContent = '📏 Analisis CENTERING sisi belakang...';
+        await this.delay(1000);
+        const backCentering = this.checkCentering(await this.getImageData(backImg), 500, Math.floor(500 * backImg.height / backImg.width));
+        
+        // Step 9: Analyze BACK - Surface
+        if (loadingText) loadingText.textContent = '🔍 Analisis SURFACE sisi belakang...';
+        await this.delay(1200);
+        const backSurface = this.checkSurface(await this.getImageData(backImg), 500, Math.floor(500 * backImg.height / backImg.width));
+        
+        // Step 10: Analyze BACK - Corners
+        if (loadingText) loadingText.textContent = '📐 Analisis CORNERS sisi belakang...';
+        await this.delay(1000);
+        const backCorners = this.checkCorners(await this.getImageData(backImg), 500, Math.floor(500 * backImg.height / backImg.width));
+        
+        // Step 11: Analyze BACK - Edges
+        if (loadingText) loadingText.textContent = '📎 Analisis EDGES sisi belakang...';
+        await this.delay(1000);
+        const backEdges = this.checkEdges(await this.getImageData(backImg), 500, Math.floor(500 * backImg.height / backImg.width));
+        
+        // Step 12: Analyze BACK - Lighting
+        if (loadingText) loadingText.textContent = '💡 Analisis LIGHTING sisi belakang...';
+        await this.delay(800);
+        const backLighting = this.checkLighting(await this.getImageData(backImg), 500, Math.floor(500 * backImg.height / backImg.width));
+        
+        const backScores = {
+            centering: backCentering,
+            surface: backSurface,
+            corners: backCorners,
+            edges: backEdges,
+            lighting: backLighting
+        };
+        
+        // Step 13: Calculate combined
+        if (loadingText) loadingText.textContent = '🧮 Menghitung grade final...';
+        await this.delay(1000);
         
         const combinedScores = {
             centering: Math.round((frontScores.centering * 0.6 + backScores.centering * 0.4)),
@@ -137,6 +210,10 @@ class CardGrader {
             edges: Math.round((frontScores.edges * 0.5 + backScores.edges * 0.5)),
             lighting: Math.round((frontScores.lighting + backScores.lighting) / 2)
         };
+        
+        // Step 14: Generate report
+        if (loadingText) loadingText.textContent = '📋 Membuat report...';
+        await this.delay(800);
         
         document.getElementById('analyzed-image').src = this.frontImage;
         this.showBackImage(this.backImage);
@@ -160,6 +237,19 @@ class CardGrader {
         loading?.classList.add('hidden');
         this.currentStep = 'front';
         this.updateGuideText();
+    }
+    
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+    
+    async getImageData(img) {
+        const c = document.createElement('canvas');
+        const x = c.getContext('2d');
+        c.width = 500;
+        c.height = Math.floor(500 * img.height / img.width);
+        x.drawImage(img, 0, 0, c.width, c.height);
+        return x.getImageData(0, 0, c.width, c.height).data;
     }
     
     generateFullReport(frontScores, backScores, combinedScores, grade) {
@@ -480,7 +570,8 @@ class CardGrader {
         return Math.round(Math.max(0, 10 - (bright/count) * 8));
     }
     
-    checkLighting(d) {
+    checkLighting(d, w, h) {
+        // w and h are optional, used when called from step-by-step analysis
         const samples = [];
         const step = Math.max(1, Math.floor((d.length/4)/3000));
         
