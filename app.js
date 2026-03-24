@@ -182,7 +182,15 @@ class CardGrader {
         await this.searchTCGAPI();
         
         if (loading) loading.classList.add('hidden');
+        
+        // Show analysis panel and card info
         document.getElementById('analysis-panel')?.classList.remove('hidden');
+        document.getElementById('card-info')?.classList.remove('hidden');
+        
+        // Reset to default values
+        document.getElementById('card-name').textContent = 'Detecting...';
+        document.getElementById('card-set').textContent = 'Searching...';
+        document.getElementById('card-rarity').textContent = '...';
     }
     
     async performOCR(imageSrc) {
