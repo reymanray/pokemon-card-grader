@@ -177,56 +177,126 @@ class CardGrader {
         document.getElementById('analyzed-image').src = imageSrc;
         this.currentCardData = { image: imageSrc, ocrText: '', tcgData: null };
         
-        await this.performAnalysis();
-        await this.performOCR(imageSrc);
-        await this.searchTCGAPI();
-        
-        if (loading) loading.classList.add('hidden');
-        
-        // Show analysis panel and card info
-        document.getElementById('analysis-panel')?.classList.remove('hidden');
-        document.getElementById('card-info')?.classList.remove('hidden');
-        
-        // Reset to default values
+        // Reset values first
         document.getElementById('card-name').textContent = 'Detecting...';
         document.getElementById('card-set').textContent = 'Searching...';
         document.getElementById('card-rarity').textContent = '...';
+        
+        // Show panel immediately
+        document.getElementById('analysis-panel')?.classList.remove('hidden');
+        document.getElementById('card-info')?.classList.remove('hidden');
+        
+        // Run analysis + OCR + API in parallel for speed
+        await this.performAnalysis(); // This is fast, do first
+        
+        // OCR with timeout (max 5 seconds)
+        const ocrPromise = this.performOCRWithTimeout(imageSrc, 5000);
+        
+        // Wait for OCR then search TCG
+        await ocrPromise;
+        await this.searchTCGAPI();
+        
+        if (loading) loading.classList.add('hidden');
+    }
+    
+    async performOCRWithTimeout(imageSrc, timeoutMs) {
+        return Promise.race([
+            this.performOCR(imageSrc),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('OCR timeout')), timeoutMs)
+            )
+        ]).catch(err => {
+            console.log('OCR failed or timeout:', err.message);
+            // Set default for manual entry
+            document.getElementById('card-name').textContent = 'Unknown Card';
+        });
     }
     
     async performOCR(imageSrc) {
         if (!window.Tesseract) {
             console.log('Tesseract loading...');
-            await new Promise(r => setTimeout(r, 2000));
-            if (!window.Tesseract) return;
+            await new Promise(r => setTimeout(r, 1500));
+            if (!window.Tesseract) {
+                document.getElementById('card-name').textContent = 'Unknown Card';
+                return;
+            }
         }
         
         const loading = document.getElementById('loading');
-        if (loading) loading.querySelector('p').textContent = 'Membaca teks kartu (OCR)...';
+        if (loading) loading.querySelector('p').textContent = 'Membaca nama kartu...';
         
         try {
-            const result = await Tesseract.recognize(imageSrc, 'eng');
-            this.currentCardData.ocrText = result.data.text;
-            console.log('OCR:', result.data.text);
+            // Quick OCR - only recognize, no detailed analysis
+            const result = await Tesseract.recognize(
+                imageSrc, 
+                'eng',
+                { 
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            console.log(`OCR: ${Math.floor(m.progress * 100)}%`);
+                        }
+                    }
+                }
+            );
             
-            // Extract card name from first few lines
-            const lines = result.data.text.split('\n').filter(l => l.trim().length > 2);
-            const cardName = lines.slice(0, 2).join(' ').substring(0, 40).trim() || 'Unknown Card';
+            this.currentCardData.ocrText = result.data.text;
+            console.log('OCR Result:', result.data.text);
+            
+            // Extract card name - look for capitalized words (Pokemon names)
+            const lines = result.data.text.split('\n')
+                .map(l => l.trim())
+                .filter(l => l.length > 2 && l.length < 40);
+            
+            // Pokemon card names are usually at the top, often in caps or title case
+            let cardName = 'Unknown Card';
+            for (const line of lines.slice(0, 4)) {
+                // Skip common non-name text
+                if (/^\d+$/.test(line)) continue; // Skip numbers only
+                if (/hp|stage|evolves|pok.mon/i.test(line)) continue; // Skip meta text
+                if (line.length > 3) {
+                    cardName = line;
+                    break;
+                }
+            }
+            
             document.getElementById('card-name').textContent = cardName;
+            console.log('Detected card name:', cardName);
         } catch (err) {
             console.error('OCR error:', err);
+            document.getElementById('card-name').textContent = 'Unknown Card';
         }
     }
     
     async searchTCGAPI() {
         const cardName = document.getElementById('card-name').textContent;
-        if (!cardName || cardName === 'Unknown Card') return;
+        if (!cardName || cardName === 'Unknown Card' || cardName === 'Detecting...') {
+            document.getElementById('card-set').textContent = 'Click Edit to add info';
+            return;
+        }
         
         const loading = document.getElementById('loading');
-        if (loading) loading.querySelector('p').textContent = 'Mencari di Pokemon TCG database...';
+        if (loading) loading.querySelector('p').textContent = 'Mencari di database...';
         
         try {
-            const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(cardName)}"&pageSize=3`);
-            const data = await response.json();
+            // Try exact search first
+            let response = await fetch(
+                `https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(cardName)}"&pageSize=1`,
+                { signal: AbortSignal.timeout(8000) }
+            );
+            
+            if (!response.ok) throw new Error('API error');
+            
+            let data = await response.json();
+            
+            // If no results, try partial search
+            if (!data.data?.length && cardName.includes(' ')) {
+                const shortName = cardName.split(' ')[0]; // Take first word
+                response = await fetch(
+                    `https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(shortName)}"&pageSize=1`,
+                    { signal: AbortSignal.timeout(8000) }
+                );
+                data = await response.json();
+            }
             
             if (data.data?.length > 0) {
                 const card = data.data[0];
@@ -236,7 +306,7 @@ class CardGrader {
                 document.getElementById('card-set').textContent = card.set?.name || 'Unknown Set';
                 document.getElementById('card-rarity').textContent = card.rarity || 'Common';
                 
-                // Add extra info
+                // Add extra info (remove old first)
                 const info = document.getElementById('card-info');
                 info.querySelector('#card-hp')?.remove();
                 info.querySelector('#card-type')?.remove();
@@ -252,10 +322,11 @@ class CardGrader {
                     info.insertAdjacentHTML('beforeend', `<p id="card-price"><strong>Price:</strong> $${card.cardmarket.prices.averageSellPrice}</p>`);
                 }
             } else {
-                document.getElementById('card-set').textContent = 'Not found in TCG database';
+                document.getElementById('card-set').textContent = 'Card not in database';
             }
         } catch (err) {
             console.error('TCG API error:', err);
+            document.getElementById('card-set').textContent = 'Search failed - Edit manually';
             document.getElementById('card-set').textContent = 'API Error - Try manual edit';
         }
     }
