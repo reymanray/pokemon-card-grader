@@ -232,13 +232,15 @@ class CardGrader {
         // Store scores for report generation after card selection
         this.lastAnalysis = { frontScores, backScores, combinedScores, grade };
         
+        // Hide report first (will show after card selected)
+        document.getElementById('full-report')?.classList.add('hidden');
+        
         // Reset card info first
         document.getElementById('card-name').textContent = '--';
         document.getElementById('card-set').textContent = '--';
         document.getElementById('card-rarity').textContent = '--';
         
-        // Remove old elements
-        document.getElementById('full-report')?.remove();
+        // Remove old search
         document.getElementById('card-search')?.remove();
         
         // Show card search
@@ -262,13 +264,9 @@ class CardGrader {
         return x.getImageData(0, 0, c.width, c.height).data;
     }
     
-    generateFullReport(frontScores, backScores, combinedScores, grade) {
-        // Remove existing report if any
-        document.getElementById('full-report')?.remove();
-        
-        const reportSection = document.createElement('div');
-        reportSection.id = 'full-report';
-        reportSection.style.cssText = 'margin-top:30px;padding:20px;background:linear-gradient(135deg, rgba(0,217,255,0.1), rgba(255,255,255,0.05));border-radius:15px;border:1px solid rgba(0,217,255,0.3);';
+    updateFullReport(frontScores, backScores, combinedScores, grade) {
+        const report = document.getElementById('full-report');
+        if (!report) return;
         
         const cardName = document.getElementById('card-name')?.textContent || 'Unknown Card';
         const cardSet = document.getElementById('card-set')?.textContent || '-';
@@ -283,63 +281,29 @@ class CardGrader {
         if (combinedScores.centering < 7) recommendation += '• Centering kurang sempurna. ';
         if (!recommendation) recommendation = '• Kartu dalam kondisi baik, layak di-grade profesional!';
         
-        reportSection.innerHTML = `
-            <h3 style="margin:0 0 20px 0;color:#00d9ff;text-align:center;">📋 GRADING REPORT</h3>
-            
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
-                <div style="text-align:center;">
-                    <img src="${this.frontImage}" style="max-width:100%;max-height:200px;border-radius:8px;border:2px solid #00d9ff;">
-                    <div style="font-size:12px;color:#aaa;margin-top:5px;">Sisi Depan</div>
-                </div>
-                <div style="text-align:center;">
-                    <img src="${this.backImage}" style="max-width:100%;max-height:200px;border-radius:8px;border:2px solid #00d9ff;">
-                    <div style="font-size:12px;color:#aaa;margin-top:5px;">Sisi Belakang</div>
-                </div>
-            </div>
-            
-            <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:10px;margin-bottom:20px;">
-                <h4 style="margin:0 0 10px 0;color:#fff;">🎴 Informasi Kartu</h4>
-                <p style="margin:5px 0;"><strong>Nama:</strong> ${cardName}</p>
-                <p style="margin:5px 0;"><strong>Set:</strong> ${cardSet}</p>
-                <p style="margin:5px 0;"><strong>Rarity:</strong> ${cardRarity}</p>
-                <p style="margin:5px 0;"><strong>Tanggal Grading:</strong> ${timestamp}</p>
-            </div>
-            
-            <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:10px;margin-bottom:20px;">
-                <h4 style="margin:0 0 15px 0;color:#fff;">📊 Skor Detail</h4>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px;font-size:14px;">
-                    <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.1);border-radius:8px;">
-                        <div style="font-size:24px;font-weight:bold;color:#00d9ff;">${combinedScores.centering}</div>
-                        <div style="font-size:12px;color:#aaa;">Centering</div>
-                    </div>
-                    <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.1);border-radius:8px;">
-                        <div style="font-size:24px;font-weight:bold;color:#00d9ff;">${combinedScores.surface}</div>
-                        <div style="font-size:12px;color:#aaa;">Surface</div>
-                    </div>
-                    <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.1);border-radius:8px;">
-                        <div style="font-size:24px;font-weight:bold;color:#00d9ff;">${combinedScores.corners}</div>
-                        <div style="font-size:12px;color:#aaa;">Corners</div>
-                    </div>
-                    <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.1);border-radius:8px;">
-                        <div style="font-size:24px;font-weight:bold;color:#00d9ff;">${combinedScores.edges}</div>
-                        <div style="font-size:12px;color:#aaa;">Edges</div>
-                    </div>
-                    <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.1);border-radius:8px;">
-                        <div style="font-size:24px;font-weight:bold;color:#00d9ff;">${combinedScores.lighting}</div>
-                        <div style="font-size:12px;color:#aaa;">Lighting</div>
-                    </div>
-                    <div style="text-align:center;padding:10px;background:linear-gradient(135deg, #00d9ff, #0088ff);border-radius:8px;">
-                        <div style="font-size:28px;font-weight:bold;color:#fff;">${grade.num}</div>
-                        <div style="font-size:12px;color:rgba(255,255,255,0.9);">FINAL</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:10px;margin-bottom:20px;">
-                <h4 style="margin:0 0 10px 0;color:#fff;">📈 Perbandingan Depan vs Belakang</h4>
-                <table style="width:100%;font-size:13px;border-collapse:collapse;">
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
-                        <th style="text-align:left;padding:8px;color:#aaa;">Aspek</th>
+        // Update images
+        document.getElementById('report-front-img').src = this.frontImage;
+        document.getElementById('report-back-img').src = this.backImage;
+        
+        // Update card info
+        document.getElementById('report-name').textContent = cardName;
+        document.getElementById('report-set').textContent = cardSet;
+        document.getElementById('report-rarity').textContent = cardRarity;
+        document.getElementById('report-date').textContent = timestamp;
+        
+        // Update scores
+        document.getElementById('report-centering').textContent = combinedScores.centering;
+        document.getElementById('report-surface').textContent = combinedScores.surface;
+        document.getElementById('report-corners').textContent = combinedScores.corners;
+        document.getElementById('report-edges').textContent = combinedScores.edges;
+        document.getElementById('report-lighting').textContent = combinedScores.lighting;
+        document.getElementById('report-final').textContent = grade.num;
+        
+        // Update recommendation
+        document.getElementById('report-recommendation').textContent = recommendation;
+        
+        // Show report
+        report.classList.remove('hidden');
                         <th style="text-align:center;padding:8px;color:#aaa;">Depan</th>
                         <th style="text-align:center;padding:8px;color:#aaa;">Belakang</th>
                         <th style="text-align:center;padding:8px;color:#00d9ff;">Final</th>
@@ -702,16 +666,14 @@ class CardGrader {
         
         document.getElementById('card-search')?.remove();
         
-        // Generate full report after card is selected (with delay for DOM update)
+        // Update and show full report after card is selected
         if (this.lastAnalysis) {
-            setTimeout(() => {
-                this.generateFullReport(
-                    this.lastAnalysis.frontScores, 
-                    this.lastAnalysis.backScores, 
-                    this.lastAnalysis.combinedScores, 
-                    this.lastAnalysis.grade
-                );
-            }, 100);
+            this.updateFullReport(
+                this.lastAnalysis.frontScores, 
+                this.lastAnalysis.backScores, 
+                this.lastAnalysis.combinedScores, 
+                this.lastAnalysis.grade
+            );
         }
     }
     
