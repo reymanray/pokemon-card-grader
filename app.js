@@ -151,11 +151,150 @@ class CardGrader {
         document.getElementById('grade-desc').textContent = `${grade.label} - ${grade.desc}`;
         
         this.showDetailBreakdown(frontScores, backScores);
+        
+        // Generate and show full report
+        this.generateFullReport(frontScores, backScores, combinedScores, grade);
+        
         this.showCardSearch();
         
         loading?.classList.add('hidden');
         this.currentStep = 'front';
         this.updateGuideText();
+    }
+    
+    generateFullReport(frontScores, backScores, combinedScores, grade) {
+        // Remove existing report if any
+        document.getElementById('full-report')?.remove();
+        
+        const reportSection = document.createElement('div');
+        reportSection.id = 'full-report';
+        reportSection.style.cssText = 'margin-top:30px;padding:20px;background:linear-gradient(135deg, rgba(0,217,255,0.1), rgba(255,255,255,0.05));border-radius:15px;border:1px solid rgba(0,217,255,0.3);';
+        
+        const cardName = document.getElementById('card-name')?.textContent || 'Unknown Card';
+        const cardSet = document.getElementById('card-set')?.textContent || '-';
+        const cardRarity = document.getElementById('card-rarity')?.textContent || '-';
+        const timestamp = new Date().toLocaleString('id-ID');
+        
+        // Calculate recommendation
+        let recommendation = '';
+        if (combinedScores.corners < 6) recommendation += '• Sudut kartu perlu diperhatikan (ada whitening/damage). ';
+        if (combinedScores.edges < 6) recommendation += '• Tepi kartu terlihat aus. ';
+        if (combinedScores.surface < 6) recommendation += '• Permukaan ada scratches/print lines. ';
+        if (combinedScores.centering < 7) recommendation += '• Centering kurang sempurna. ';
+        if (!recommendation) recommendation = '• Kartu dalam kondisi baik, layak di-grade profesional!';
+        
+        reportSection.innerHTML = `
+            <h3 style="margin:0 0 20px 0;color:#00d9ff;text-align:center;">📋 GRADING REPORT</h3>
+            
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+                <div style="text-align:center;">
+                    <img src="${this.frontImage}" style="max-width:100%;max-height:200px;border-radius:8px;border:2px solid #00d9ff;">
+                    <div style="font-size:12px;color:#aaa;margin-top:5px;">Sisi Depan</div>
+                </div>
+                <div style="text-align:center;">
+                    <img src="${this.backImage}" style="max-width:100%;max-height:200px;border-radius:8px;border:2px solid #00d9ff;">
+                    <div style="font-size:12px;color:#aaa;margin-top:5px;">Sisi Belakang</div>
+                </div>
+            </div>
+            
+            <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:10px;margin-bottom:20px;">
+                <h4 style="margin:0 0 10px 0;color:#fff;">🎴 Informasi Kartu</h4>
+                <p style="margin:5px 0;"><strong>Nama:</strong> ${cardName}</p>
+                <p style="margin:5px 0;"><strong>Set:</strong> ${cardSet}</p>
+                <p style="margin:5px 0;"><strong>Rarity:</strong> ${cardRarity}</p>
+                <p style="margin:5px 0;"><strong>Tanggal Grading:</strong> ${timestamp}</p>
+            </div>
+            
+            <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:10px;margin-bottom:20px;">
+                <h4 style="margin:0 0 15px 0;color:#fff;">📊 Skor Detail</h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px;font-size:14px;">
+                    <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.1);border-radius:8px;">
+                        <div style="font-size:24px;font-weight:bold;color:#00d9ff;">${combinedScores.centering}</div>
+                        <div style="font-size:12px;color:#aaa;">Centering</div>
+                    </div>
+                    <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.1);border-radius:8px;">
+                        <div style="font-size:24px;font-weight:bold;color:#00d9ff;">${combinedScores.surface}</div>
+                        <div style="font-size:12px;color:#aaa;">Surface</div>
+                    </div>
+                    <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.1);border-radius:8px;">
+                        <div style="font-size:24px;font-weight:bold;color:#00d9ff;">${combinedScores.corners}</div>
+                        <div style="font-size:12px;color:#aaa;">Corners</div>
+                    </div>
+                    <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.1);border-radius:8px;">
+                        <div style="font-size:24px;font-weight:bold;color:#00d9ff;">${combinedScores.edges}</div>
+                        <div style="font-size:12px;color:#aaa;">Edges</div>
+                    </div>
+                    <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.1);border-radius:8px;">
+                        <div style="font-size:24px;font-weight:bold;color:#00d9ff;">${combinedScores.lighting}</div>
+                        <div style="font-size:12px;color:#aaa;">Lighting</div>
+                    </div>
+                    <div style="text-align:center;padding:10px;background:linear-gradient(135deg, #00d9ff, #0088ff);border-radius:8px;">
+                        <div style="font-size:28px;font-weight:bold;color:#fff;">${grade.num}</div>
+                        <div style="font-size:12px;color:rgba(255,255,255,0.9);">FINAL</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:10px;margin-bottom:20px;">
+                <h4 style="margin:0 0 10px 0;color:#fff;">📈 Perbandingan Depan vs Belakang</h4>
+                <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                        <th style="text-align:left;padding:8px;color:#aaa;">Aspek</th>
+                        <th style="text-align:center;padding:8px;color:#aaa;">Depan</th>
+                        <th style="text-align:center;padding:8px;color:#aaa;">Belakang</th>
+                        <th style="text-align:center;padding:8px;color:#00d9ff;">Final</th>
+                    </tr>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <td style="padding:8px;">Centering</td>
+                        <td style="text-align:center;padding:8px;">${frontScores.centering}</td>
+                        <td style="text-align:center;padding:8px;">${backScores.centering}</td>
+                        <td style="text-align:center;padding:8px;font-weight:bold;color:#00d9ff;">${combinedScores.centering}</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <td style="padding:8px;">Surface</td>
+                        <td style="text-align:center;padding:8px;">${frontScores.surface}</td>
+                        <td style="text-align:center;padding:8px;">${backScores.surface}</td>
+                        <td style="text-align:center;padding:8px;font-weight:bold;color:#00d9ff;">${combinedScores.surface}</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <td style="padding:8px;">Corners</td>
+                        <td style="text-align:center;padding:8px;">${frontScores.corners}</td>
+                        <td style="text-align:center;padding:8px;">${backScores.corners}</td>
+                        <td style="text-align:center;padding:8px;font-weight:bold;color:#00d9ff;">${combinedScores.corners}</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <td style="padding:8px;">Edges</td>
+                        <td style="text-align:center;padding:8px;">${frontScores.edges}</td>
+                        <td style="text-align:center;padding:8px;">${backScores.edges}</td>
+                        <td style="text-align:center;padding:8px;font-weight:bold;color:#00d9ff;">${combinedScores.edges}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px;">Lighting</td>
+                        <td style="text-align:center;padding:8px;">${frontScores.lighting}</td>
+                        <td style="text-align:center;padding:8px;">${backScores.lighting}</td>
+                        <td style="text-align:center;padding:8px;font-weight:bold;color:#00d9ff;">${combinedScores.lighting}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="background:rgba(255,193,7,0.1);padding:15px;border-radius:10px;border-left:4px solid #ffc107;">
+                <h4 style="margin:0 0 10px 0;color:#ffc107;">💡 Rekomendasi</h4>
+                <p style="margin:0;font-size:14px;line-height:1.6;">${recommendation}</p>
+            </div>
+            
+            <div style="margin-top:20px;padding:15px;background:rgba(0,0,0,0.3);border-radius:10px;text-align:center;">
+                <div style="font-size:12px;color:#aaa;margin-bottom:10px;">Grade Category</div>
+                <div style="font-size:32px;font-weight:bold;color:#00d9ff;margin-bottom:5px;">${grade.label}</div>
+                <div style="font-size:14px;color:#fff;">${grade.desc}</div>
+            </div>
+        `;
+        
+        // Insert report after card-info section
+        const cardInfo = document.getElementById('card-info');
+        cardInfo?.insertAdjacentElement('afterend', reportSection);
+        
+        // Scroll to report
+        reportSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     
     showBackImage(src) {
