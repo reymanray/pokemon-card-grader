@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Pokemon Card AI Grader</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>🃏 AI Card Grader</h1>
+            <p>Grading kartu Pokemon gratis</p>
+        </header>
+
+        <!-- Main Camera View -->
+        <main class="camera-section">
+            <div class="camera-container">
+                <video id="camera-feed" autoplay playsinline muted></video>
+                <canvas id="camera-canvas" style="display:none;"></canvas>
+                
+                <!-- Guide Frame -->
+                <div class="card-guide">
+                    <div class="guide-corner tl"></div>
+                    <div class="guide-corner tr"></div>
+                    <div class="guide-corner bl"></div>
+                    <div class="guide-corner br"></div>
+                    <span class="guide-text">Posisikan kartu di area ini</span>
+                </div>
+
+                <!-- Detection Overlay -->
+                <div id="detection-overlay" class="detection-overlay hidden">
+                    <div class="detected-box"></div>
+                </div>
+            </div>
+
+            <!-- Capture Button -->
+            <div class="capture-controls">
+                <button id="capture-btn" class="btn-capture">
+                    <span class="capture-ring"></span>
+                </button>
+                <p class="capture-hint">Tap untuk foto & grade</p>
+            </div>
+
+            <!-- Gallery Button -->
+            <button id="gallery-btn" class="btn-gallery">
+                📷 Galeri
+            </button>
+            <input type="file" id="file-input" accept="image/*" style="display:none;">
+        </main>
+
+        <!-- Analysis Panel -->
+        <div id="analysis-panel" class="analysis-panel hidden">
+            <div class="panel-header">
+                <h2>📊 Hasil Analisis</h2>
+                <button id="close-analysis" class="btn-close">✕</button>
+            </div>
+
+            <div class="result-image">
+                <img id="analyzed-image" src="" alt="Analyzed card">
+            </div>
+
+            <!-- Grade Badge -->
+            <div class="grade-section">
+                <div id="grade-badge" class="grade-badge">
+                    <span class="grade-value">--</span>
+                    <span class="grade-label">/10</span>
+                </div>
+                <p id="grade-desc" class="grade-desc">Belum dianalisis</p>
+            </div>
+
+            <!-- Analysis Details -->
+            <div class="analysis-details">
+                <h3>📋 Detail Analisis</h3>
+                
+                <div class="score-item">
+                    <span class="score-label">Centering</span>
+                    <div class="score-bar">
+                        <div id="score-centering" class="score-fill"></div>
+                    </div>
+                    <span id="value-centering" class="score-value">--</span>
+                </div>
+
+                <div class="score-item">
+                    <span class="score-label">Surface</span>
+                    <div class="score-bar">
+                        <div id="score-surface" class="score-fill"></div>
+                    </div>
+                    <span id="value-surface" class="score-value">--</span>
+                </div>
+
+                <div class="score-item">
+                    <span class="score-label">Corners</span>
+                    <div class="score-bar">
+                        <div id="score-corners" class="score-fill"></div>
+                    </div>
+                    <span id="value-corners" class="score-value">--</span>
+                </div>
+
+                <div class="score-item">
+                    <span class="score-label">Edges</span>
+                    <div class="score-bar">
+                        <div id="score-edges" class="score-fill"></div>
+                    </div>
+                    <span id="value-edges" class="score-value">--</span>
+                </div>
+
+                <div class="score-item">
+                    <span class="score-label">Pencahayaan</span>
+                    <div class="score-bar">
+                        <div id="score-lighting" class="score-fill"></div>
+                    </div>
+                    <span id="value-lighting" class="score-value">--</span>
+                </div>
+            </div>
+
+            <!-- Card Info -->
+            <div id="card-info" class="card-info hidden">
+                <h3>🎴 Info Kartu</h3>
+                <p><strong>Nama:</strong> <span id="card-name">--</span></p>
+                <p><strong>Set:</strong> <span id="card-set">--</span></p>
+                <p><strong>Rarity:</strong> <span id="card-rarity">--</span></p>
+            </div>
+
+            <!-- Actions -->
+            <div class="action-buttons">
+                <button id="retry-btn" class="btn-secondary">📷 Foto Ulang</button>
+                <button id="save-btn" class="btn-primary">💾 Simpan Hasil</button>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <section class="instructions">
+            <h3>📸 Tips Foto</h3>
+            <ul>
+                <li>Pencahayaan cukup terang</li>
+                <li>Hindari shadow/glare</li>
+                <li>Posisi kartu lurus</li>
+                <li>Background polos (putih/hitam)</li>
+            </ul>
+        </section>
+
+        <!-- Loading State -->
+        <div id="loading" class="loading-overlay hidden">
+            <div class="spinner"></div>
+            <p>Analisis AI berjalan...</p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "pokemon-card-ai-grader",
+  "version": "1.0.0",
+  "description": "AI-powered Pokemon card grading app for mobile",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve . -l 3000"
+  },
+  "keywords": ["pokemon", "card", "grading", "ai", "tensorflow"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.0"
+  }
+}
