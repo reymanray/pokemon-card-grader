@@ -1,4 +1,4 @@
-// Pokemon Card AI Grader - REAL Implementation
+// Pokemon Card AI Grader - REAL Implementation with TCG API
 class CardGrader {
     constructor() {
         this.video = document.getElementById('camera-feed');
@@ -6,6 +6,7 @@ class CardGrader {
         this.ctx = this.canvas.getContext('2d');
         this.stream = null;
         this.cameraReady = false;
+        this.tcgData = null;
         this.init();
     }
     
@@ -34,7 +35,7 @@ class CardGrader {
         document.getElementById('close-analysis')?.addEventListener('click', () => document.getElementById('analysis-panel')?.classList.add('hidden'));
         document.getElementById('retry-btn')?.addEventListener('click', () => document.getElementById('analysis-panel')?.classList.add('hidden'));
         document.getElementById('save-btn')?.addEventListener('click', () => this.saveResult());
-        document.getElementById('edit-card-btn')?.addEventListener('click', () => this.showManualEdit());
+        document.getElementById('edit-card-btn')?.addEventListener('click', () => this.showCardSearch());
     }
     
     captureAndGrade() {
@@ -66,10 +67,7 @@ class CardGrader {
         document.querySelector('.grade-value').textContent = grade.num;
         document.getElementById('grade-desc').textContent = `${grade.label} - ${grade.desc}`;
         
-        document.getElementById('card-name').textContent = 'Unknown';
-        document.getElementById('card-set').textContent = 'Click Edit to add info';
-        document.getElementById('card-rarity').textContent = '-';
-        
+        this.showCardSearch();
         loading?.classList.add('hidden');
     }
     
@@ -183,37 +181,100 @@ class CardGrader {
         }
     }
     
-    showManualEdit() {
+    showCardSearch() {
         const info = document.getElementById('card-info');
-        document.getElementById('manual-edit')?.remove();
+        document.getElementById('card-search')?.remove();
         
-        const form = document.createElement('div');
-        form.id = 'manual-edit';
-        form.innerHTML = `
+        const searchDiv = document.createElement('div');
+        searchDiv.id = 'card-search';
+        searchDiv.innerHTML = `
             <div style="margin-top:15px;padding:15px;background:rgba(255,255,255,0.1);border-radius:8px;">
-                <h4>✏️ Edit Info</h4>
-                <input id="en" value="${document.getElementById('card-name').textContent}" style="width:100%;padding:8px;margin:5px 0;border-radius:4px;border:none;" placeholder="Nama Kartu">
-                <input id="es" value="${document.getElementById('card-set').textContent}" style="width:100%;padding:8px;margin:5px 0;border-radius:4px;border:none;" placeholder="Set">
-                <input id="er" value="${document.getElementById('card-rarity').textContent}" style="width:100%;padding:8px;margin:5px 0;border-radius:4px;border:none;" placeholder="Rarity">
-                <button id="sv" style="background:#00d9ff;color:#000;border:none;padding:10px 20px;border-radius:20px;cursor:pointer;margin-top:10px;font-weight:bold;">💾 Simpan</button>
+                <h4>🔍 Cari Kartu</h4>
+                <input id="search-input" style="width:100%;padding:10px;margin:5px 0;border-radius:4px;border:none;font-size:14px;" placeholder="Ketik nama kartu (contoh: Charizard, Pikachu)...">
+                <div id="search-results" style="max-height:200px;overflow-y:auto;margin-top:10px;"></div>
             </div>`;
-        info.appendChild(form);
+        info.appendChild(searchDiv);
         
-        document.getElementById('sv').addEventListener('click', () => {
-            document.getElementById('card-name').textContent = document.getElementById('en').value || 'Unknown';
-            document.getElementById('card-set').textContent = document.getElementById('es').value || 'Unknown';
-            document.getElementById('card-rarity').textContent = document.getElementById('er').value || 'Unknown';
-            form.remove();
+        const input = document.getElementById('search-input');
+        let debounceTimer;
+        
+        input.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => this.searchTCG(e.target.value), 500);
         });
+        
+        input.focus();
+    }
+    
+    async searchTCG(query) {
+        if (!query || query.length < 2) return;
+        
+        const resultsDiv = document.getElementById('search-results');
+        resultsDiv.innerHTML = '<p style="color:#aaa;font-size:12px;">Mencari...</p>';
+        
+        try {
+            const res = await fetch(`https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(query)}"&pageSize=10`);
+            const data = await res.json();
+            
+            if (data.data?.length > 0) {
+                resultsDiv.innerHTML = data.data.map(card => `
+                    <div class="card-result" data-id="${card.id}" style="padding:10px;margin:5px 0;background:rgba(255,255,255,0.1);border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:10px;">
+                        <img src="${card.images.small}" style="width:50px;height:70px;object-fit:contain;border-radius:4px;">
+                        <div style="flex:1;">
+                            <div style="font-weight:bold;color:#fff;">${card.name}</div>
+                            <div style="font-size:12px;color:#aaa;">${card.set.name} • ${card.rarity || 'Common'}</div>
+                            ${card.cardmarket?.prices?.averageSellPrice ? `<div style="font-size:12px;color:#00d9ff;">$${card.cardmarket.prices.averageSellPrice}</div>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+                
+                resultsDiv.querySelectorAll('.card-result').forEach(el => {
+                    el.addEventListener('click', () => {
+                        const card = data.data.find(c => c.id === el.dataset.id);
+                        if (card) this.selectCard(card);
+                    });
+                });
+            } else {
+                resultsDiv.innerHTML = '<p style="color:#aaa;font-size:12px;">Kartu tidak ditemukan</p>';
+            }
+        } catch (err) {
+            resultsDiv.innerHTML = '<p style="color:#ff6b6b;font-size:12px;">Error mencari kartu</p>';
+        }
+    }
+    
+    selectCard(card) {
+        this.tcgData = card;
+        
+        document.getElementById('card-name').textContent = card.name;
+        document.getElementById('card-set').textContent = card.set.name;
+        document.getElementById('card-rarity').textContent = card.rarity || 'Common';
+        
+        const info = document.getElementById('card-info');
+        info.querySelector('#card-hp')?.remove();
+        info.querySelector('#card-type')?.remove();
+        info.querySelector('#card-price')?.remove();
+        info.querySelector('#card-number')?.remove();
+        
+        if (card.hp) info.insertAdjacentHTML('beforeend', `<p id="card-hp"><strong>HP:</strong> ${card.hp}</p>`);
+        if (card.types?.length) info.insertAdjacentHTML('beforeend', `<p id="card-type"><strong>Type:</strong> ${card.types.join(', ')}</p>`);
+        if (card.number) info.insertAdjacentHTML('beforeend', `<p id="card-number"><strong>Number:</strong> ${card.number}/${card.set.printedTotal}</p>`);
+        if (card.cardmarket?.prices?.averageSellPrice) {
+            info.insertAdjacentHTML('beforeend', `<p id="card-price"><strong>Market Price:</strong> <span style="color:#00d9ff;">$${card.cardmarket.prices.averageSellPrice}</span></p>`);
+        }
+        
+        document.getElementById('card-search')?.remove();
     }
     
     saveResult() {
         const grade = document.querySelector('.grade-value')?.textContent || '0';
+        const name = document.getElementById('card-name')?.textContent || 'Unknown';
         const c = document.createElement('canvas');
         const x = c.getContext('2d');
         c.width = 800; c.height = 600;
         x.fillStyle = '#1a1a2e'; x.fillRect(0, 0, c.width, c.height);
-        x.fillStyle = '#fff'; x.font = 'bold 48px Arial'; x.textAlign = 'center';
+        x.fillStyle = '#fff'; x.font = 'bold 36px Arial'; x.textAlign = 'center';
+        x.fillText(name.substring(0, 30), c.width/2, 80);
+        x.font = 'bold 48px Arial';
         x.fillText(`Grade: ${grade}/10`, c.width/2, 150);
         const a = document.createElement('a');
         a.download = `grade-${Date.now()}.png`;
