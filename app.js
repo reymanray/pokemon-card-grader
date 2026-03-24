@@ -187,11 +187,13 @@ class CardGrader {
         // Store for later
         this.lastAnalysis = { frontScores, backScores, combinedScores, grade };
         
-        // Reset and show search
-        document.getElementById('card-name').textContent = '--';
-        document.getElementById('card-set').textContent = '--';
-        document.getElementById('card-rarity').textContent = '--';
-        document.getElementById('full-report')?.classList.add('hidden');
+        // Show report IMMEDIATELY with placeholder card info
+        document.getElementById('card-name').textContent = 'Unknown Card';
+        document.getElementById('card-set').textContent = '-';
+        document.getElementById('card-rarity').textContent = '-';
+        this.updateFullReport(frontScores, backScores, combinedScores, grade);
+        
+        // Show search for user to optionally add card info
         document.getElementById('card-search')?.remove();
         this.showCardSearch();
         
