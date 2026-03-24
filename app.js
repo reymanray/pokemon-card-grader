@@ -421,11 +421,23 @@ class CardGrader {
         if (!query || query.length < 2) return;
         
         const resultsDiv = document.getElementById('search-results');
+        if (!resultsDiv) {
+            console.error('search-results element not found');
+            return;
+        }
+        
         resultsDiv.innerHTML = '<p style="color:#aaa;font-size:12px;">Mencari...</p>';
         
         try {
+            console.log('Searching for:', query);
             const res = await fetch(`https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(query)}"&pageSize=8`);
+            
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            
             const data = await res.json();
+            console.log('Search results:', data);
             
             if (data.data?.length > 0) {
                 resultsDiv.innerHTML = data.data.map(card => `
@@ -454,42 +466,82 @@ class CardGrader {
     }
     
     selectCard(card) {
-        this.tcgData = card;
-        document.getElementById('card-name').textContent = card.name;
-        document.getElementById('card-set').textContent = card.set.name;
-        document.getElementById('card-rarity').textContent = card.rarity || 'Common';
+        console.log('Selected card:', card);
         
-        const info = document.getElementById('card-info');
-        ['#card-hp','#card-type','#card-price','#card-number'].forEach(sel => info.querySelector(sel)?.remove());
-        
-        if (card.hp) info.insertAdjacentHTML('beforeend', `<p id="card-hp"><strong>HP:</strong> ${card.hp}</p>`);
-        if (card.types?.length) info.insertAdjacentHTML('beforeend', `<p id="card-type"><strong>Type:</strong> ${card.types.join(', ')}</p>`);
-        if (card.number) info.insertAdjacentHTML('beforeend', `<p id="card-number"><strong>Number:</strong> ${card.number}/${card.set.printedTotal}</p>`);
-        if (card.cardmarket?.prices?.averageSellPrice) {
-            info.insertAdjacentHTML('beforeend', `<p id="card-price"><strong>Market Price:</strong> <span style="color:#00d9ff;">$${card.cardmarket.prices.averageSellPrice}</span></p>`);
+        if (!card || !card.name) {
+            console.error('Invalid card data');
+            return;
         }
         
+        this.tcgData = card;
+        
+        // Update card info display
+        const cardNameEl = document.getElementById('card-name');
+        const cardSetEl = document.getElementById('card-set');
+        const cardRarityEl = document.getElementById('card-rarity');
+        
+        if (cardNameEl) cardNameEl.textContent = card.name;
+        if (cardSetEl) cardSetEl.textContent = card.set?.name || '-';
+        if (cardRarityEl) cardRarityEl.textContent = card.rarity || 'Common';
+        
+        console.log('Updated card info:', {
+            name: card.name,
+            set: card.set?.name,
+            rarity: card.rarity
+        });
+        
+        // Add extra info
+        const info = document.getElementById('card-info');
+        if (info) {
+            ['#card-hp','#card-type','#card-price','#card-number'].forEach(sel => {
+                const el = info.querySelector(sel);
+                if (el) el.remove();
+            });
+            
+            if (card.hp) info.insertAdjacentHTML('beforeend', `<p id="card-hp"><strong>HP:</strong> ${card.hp}</p>`);
+            if (card.types?.length) info.insertAdjacentHTML('beforeend', `<p id="card-type"><strong>Type:</strong> ${card.types.join(', ')}</p>`);
+            if (card.number) info.insertAdjacentHTML('beforeend', `<p id="card-number"><strong>Number:</strong> ${card.number}/${card.set?.printedTotal || '?'}</p>`);
+            if (card.cardmarket?.prices?.averageSellPrice) {
+                info.insertAdjacentHTML('beforeend', `<p id="card-price"><strong>Market Price:</strong> <span style="color:#00d9ff;">$${card.cardmarket.prices.averageSellPrice}</span></p>`);
+            }
+        }
+        
+        // Remove search box
         document.getElementById('card-search')?.remove();
         
         // Update and show report
         if (this.lastAnalysis) {
+            console.log('Updating full report with analysis:', this.lastAnalysis);
             this.updateFullReport(
                 this.lastAnalysis.frontScores, 
                 this.lastAnalysis.backScores, 
                 this.lastAnalysis.combinedScores, 
                 this.lastAnalysis.grade
             );
+        } else {
+            console.warn('No analysis data available');
         }
     }
     
     updateFullReport(frontScores, backScores, combinedScores, grade) {
-        const report = document.getElementById('full-report');
-        if (!report) return;
+        console.log('Updating full report...');
         
-        const cardName = document.getElementById('card-name')?.textContent || 'Unknown Card';
-        const cardSet = document.getElementById('card-set')?.textContent || '-';
-        const cardRarity = document.getElementById('card-rarity')?.textContent || '-';
+        const report = document.getElementById('full-report');
+        if (!report) {
+            console.error('Report element not found');
+            return;
+        }
+        
+        const cardNameEl = document.getElementById('card-name');
+        const cardSetEl = document.getElementById('card-set');
+        const cardRarityEl = document.getElementById('card-rarity');
+        
+        const cardName = cardNameEl?.textContent || 'Unknown Card';
+        const cardSet = cardSetEl?.textContent || '-';
+        const cardRarity = cardRarityEl?.textContent || '-';
         const timestamp = new Date().toLocaleString('id-ID');
+        
+        console.log('Report data:', { cardName, cardSet, cardRarity, grade });
         
         let recommendation = '';
         if (combinedScores.corners < 6) recommendation += '• Sudut kartu perlu diperhatikan. ';
