@@ -1,4 +1,4 @@
-// Pokemon Card AI Grader - Front & Back Implementation
+// Pokemon Card AI Grader
 class CardGrader {
     constructor() {
         this.video = document.getElementById('camera-feed');
@@ -10,6 +10,7 @@ class CardGrader {
         this.frontImage = null;
         this.backImage = null;
         this.currentStep = 'front';
+        this.lastAnalysis = null;
         this.init();
     }
     
@@ -79,6 +80,9 @@ class CardGrader {
         this.frontImage = null;
         this.backImage = null;
         this.updateGuideText();
+        document.getElementById('full-report')?.classList.add('hidden');
+        document.getElementById('score-breakdown')?.remove();
+        document.getElementById('card-search')?.remove();
     }
     
     capture() {
@@ -119,88 +123,42 @@ class CardGrader {
     
     async analyzeBoth() {
         const loading = document.getElementById('loading');
-        loading?.classList.remove('hidden');
         const loadingText = loading?.querySelector('p');
+        loading?.classList.remove('hidden');
         
-        // Step 1: Load images
         if (loadingText) loadingText.textContent = '📸 Memuat gambar...';
         await this.delay(800);
         
         const frontImg = await this.loadImage(this.frontImage);
         const backImg = await this.loadImage(this.backImage);
         
-        // Step 2: Preprocessing
-        if (loadingText) loadingText.textContent = '🔧 Preprocessing gambar (blur noise reduction)...';
+        if (loadingText) loadingText.textContent = '🔧 Preprocessing gambar...';
         await this.delay(1200);
         
-        // Step 3: Analyze FRONT - Centering
-        if (loadingText) loadingText.textContent = '📏 Analisis CENTERING sisi depan...';
-        await this.delay(1000);
-        const frontCentering = this.checkCentering(await this.getImageData(frontImg), 500, Math.floor(500 * frontImg.height / frontImg.width));
-        
-        // Step 4: Analyze FRONT - Surface
-        if (loadingText) loadingText.textContent = '🔍 Analisis SURFACE sisi depan (scratches/print lines)...';
-        await this.delay(1200);
-        const frontSurface = this.checkSurface(await this.getImageData(frontImg), 500, Math.floor(500 * frontImg.height / frontImg.width));
-        
-        // Step 5: Analyze FRONT - Corners
-        if (loadingText) loadingText.textContent = '📐 Analisis CORNERS sisi depan (whitening/damage)...';
-        await this.delay(1000);
-        const frontCorners = this.checkCorners(await this.getImageData(frontImg), 500, Math.floor(500 * frontImg.height / frontImg.width));
-        
-        // Step 6: Analyze FRONT - Edges
-        if (loadingText) loadingText.textContent = '📎 Analisis EDGES sisi depan (wear/chipping)...';
-        await this.delay(1000);
-        const frontEdges = this.checkEdges(await this.getImageData(frontImg), 500, Math.floor(500 * frontImg.height / frontImg.width));
-        
-        // Step 7: Analyze FRONT - Lighting
-        if (loadingText) loadingText.textContent = '💡 Analisis LIGHTING sisi depan...';
-        await this.delay(800);
-        const frontLighting = this.checkLighting(await this.getImageData(frontImg), 500, Math.floor(500 * frontImg.height / frontImg.width));
-        
+        // Analyze front
+        const frontData = await this.getImageData(frontImg);
         const frontScores = {
-            centering: frontCentering,
-            surface: frontSurface,
-            corners: frontCorners,
-            edges: frontEdges,
-            lighting: frontLighting
+            centering: this.checkCentering(frontData, 500, Math.floor(500 * frontImg.height / frontImg.width)),
+            surface: this.checkSurface(frontData, 500, Math.floor(500 * frontImg.height / frontImg.width)),
+            corners: this.checkCorners(frontData, 500, Math.floor(500 * frontImg.height / frontImg.width)),
+            edges: this.checkEdges(frontData, 500, Math.floor(500 * frontImg.height / frontImg.width)),
+            lighting: this.checkLighting(frontData)
         };
         
-        // Step 8: Analyze BACK - Centering
-        if (loadingText) loadingText.textContent = '📏 Analisis CENTERING sisi belakang...';
-        await this.delay(1000);
-        const backCentering = this.checkCentering(await this.getImageData(backImg), 500, Math.floor(500 * backImg.height / backImg.width));
+        if (loadingText) loadingText.textContent = '📐 Analisis sisi belakang...';
+        await this.delay(2000);
         
-        // Step 9: Analyze BACK - Surface
-        if (loadingText) loadingText.textContent = '🔍 Analisis SURFACE sisi belakang...';
-        await this.delay(1200);
-        const backSurface = this.checkSurface(await this.getImageData(backImg), 500, Math.floor(500 * backImg.height / backImg.width));
-        
-        // Step 10: Analyze BACK - Corners
-        if (loadingText) loadingText.textContent = '📐 Analisis CORNERS sisi belakang...';
-        await this.delay(1000);
-        const backCorners = this.checkCorners(await this.getImageData(backImg), 500, Math.floor(500 * backImg.height / backImg.width));
-        
-        // Step 11: Analyze BACK - Edges
-        if (loadingText) loadingText.textContent = '📎 Analisis EDGES sisi belakang...';
-        await this.delay(1000);
-        const backEdges = this.checkEdges(await this.getImageData(backImg), 500, Math.floor(500 * backImg.height / backImg.width));
-        
-        // Step 12: Analyze BACK - Lighting
-        if (loadingText) loadingText.textContent = '💡 Analisis LIGHTING sisi belakang...';
-        await this.delay(800);
-        const backLighting = this.checkLighting(await this.getImageData(backImg), 500, Math.floor(500 * backImg.height / backImg.width));
-        
+        // Analyze back
+        const backData = await this.getImageData(backImg);
         const backScores = {
-            centering: backCentering,
-            surface: backSurface,
-            corners: backCorners,
-            edges: backEdges,
-            lighting: backLighting
+            centering: this.checkCentering(backData, 500, Math.floor(500 * backImg.height / backImg.width)),
+            surface: this.checkSurface(backData, 500, Math.floor(500 * backImg.height / backImg.width)),
+            corners: this.checkCorners(backData, 500, Math.floor(500 * backImg.height / backImg.width)),
+            edges: this.checkEdges(backData, 500, Math.floor(500 * backImg.height / backImg.width)),
+            lighting: this.checkLighting(backData)
         };
         
-        // Step 13: Calculate combined
-        if (loadingText) loadingText.textContent = '🧮 Menghitung grade final...';
+        if (loadingText) loadingText.textContent = '🧮 Menghitung grade...';
         await this.delay(1000);
         
         const combinedScores = {
@@ -211,10 +169,9 @@ class CardGrader {
             lighting: Math.round((frontScores.lighting + backScores.lighting) / 2)
         };
         
-        // Step 14: Generate report
-        if (loadingText) loadingText.textContent = '📋 Membuat report...';
-        await this.delay(800);
+        const grade = this.calcGrade(combinedScores);
         
+        // Show results
         document.getElementById('analyzed-image').src = this.frontImage;
         this.showBackImage(this.backImage);
         
@@ -222,28 +179,20 @@ class CardGrader {
         document.getElementById('card-info')?.classList.remove('hidden');
         
         this.displayScores(combinedScores);
-        
-        const grade = this.calcGrade(combinedScores);
         document.querySelector('.grade-value').textContent = grade.num;
         document.getElementById('grade-desc').textContent = `${grade.label} - ${grade.desc}`;
         
         this.showDetailBreakdown(frontScores, backScores);
         
-        // Store scores for report generation after card selection
+        // Store for later
         this.lastAnalysis = { frontScores, backScores, combinedScores, grade };
         
-        // Hide report first (will show after card selected)
-        document.getElementById('full-report')?.classList.add('hidden');
-        
-        // Reset card info first
+        // Reset and show search
         document.getElementById('card-name').textContent = '--';
         document.getElementById('card-set').textContent = '--';
         document.getElementById('card-rarity').textContent = '--';
-        
-        // Remove old search
+        document.getElementById('full-report')?.classList.add('hidden');
         document.getElementById('card-search')?.remove();
-        
-        // Show card search
         this.showCardSearch();
         
         loading?.classList.add('hidden');
@@ -264,197 +213,12 @@ class CardGrader {
         return x.getImageData(0, 0, c.width, c.height).data;
     }
     
-    updateFullReport(frontScores, backScores, combinedScores, grade) {
-        const report = document.getElementById('full-report');
-        if (!report) return;
-        
-        const cardName = document.getElementById('card-name')?.textContent || 'Unknown Card';
-        const cardSet = document.getElementById('card-set')?.textContent || '-';
-        const cardRarity = document.getElementById('card-rarity')?.textContent || '-';
-        const timestamp = new Date().toLocaleString('id-ID');
-        
-        // Calculate recommendation
-        let recommendation = '';
-        if (combinedScores.corners < 6) recommendation += '• Sudut kartu perlu diperhatikan (ada whitening/damage). ';
-        if (combinedScores.edges < 6) recommendation += '• Tepi kartu terlihat aus. ';
-        if (combinedScores.surface < 6) recommendation += '• Permukaan ada scratches/print lines. ';
-        if (combinedScores.centering < 7) recommendation += '• Centering kurang sempurna. ';
-        if (!recommendation) recommendation = '• Kartu dalam kondisi baik, layak di-grade profesional!';
-        
-        // Update images
-        document.getElementById('report-front-img').src = this.frontImage;
-        document.getElementById('report-back-img').src = this.backImage;
-        
-        // Update card info
-        document.getElementById('report-name').textContent = cardName;
-        document.getElementById('report-set').textContent = cardSet;
-        document.getElementById('report-rarity').textContent = cardRarity;
-        document.getElementById('report-date').textContent = timestamp;
-        
-        // Update scores
-        document.getElementById('report-centering').textContent = combinedScores.centering;
-        document.getElementById('report-surface').textContent = combinedScores.surface;
-        document.getElementById('report-corners').textContent = combinedScores.corners;
-        document.getElementById('report-edges').textContent = combinedScores.edges;
-        document.getElementById('report-lighting').textContent = combinedScores.lighting;
-        document.getElementById('report-final').textContent = grade.num;
-        
-        // Update recommendation
-        document.getElementById('report-recommendation').textContent = recommendation;
-        
-        // Show report
-        report.classList.remove('hidden');
-                        <th style="text-align:center;padding:8px;color:#aaa;">Depan</th>
-                        <th style="text-align:center;padding:8px;color:#aaa;">Belakang</th>
-                        <th style="text-align:center;padding:8px;color:#00d9ff;">Final</th>
-                    </tr>
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                        <td style="padding:8px;">Centering</td>
-                        <td style="text-align:center;padding:8px;">${frontScores.centering}</td>
-                        <td style="text-align:center;padding:8px;">${backScores.centering}</td>
-                        <td style="text-align:center;padding:8px;font-weight:bold;color:#00d9ff;">${combinedScores.centering}</td>
-                    </tr>
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                        <td style="padding:8px;">Surface</td>
-                        <td style="text-align:center;padding:8px;">${frontScores.surface}</td>
-                        <td style="text-align:center;padding:8px;">${backScores.surface}</td>
-                        <td style="text-align:center;padding:8px;font-weight:bold;color:#00d9ff;">${combinedScores.surface}</td>
-                    </tr>
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                        <td style="padding:8px;">Corners</td>
-                        <td style="text-align:center;padding:8px;">${frontScores.corners}</td>
-                        <td style="text-align:center;padding:8px;">${backScores.corners}</td>
-                        <td style="text-align:center;padding:8px;font-weight:bold;color:#00d9ff;">${combinedScores.corners}</td>
-                    </tr>
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                        <td style="padding:8px;">Edges</td>
-                        <td style="text-align:center;padding:8px;">${frontScores.edges}</td>
-                        <td style="text-align:center;padding:8px;">${backScores.edges}</td>
-                        <td style="text-align:center;padding:8px;font-weight:bold;color:#00d9ff;">${combinedScores.edges}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:8px;">Lighting</td>
-                        <td style="text-align:center;padding:8px;">${frontScores.lighting}</td>
-                        <td style="text-align:center;padding:8px;">${backScores.lighting}</td>
-                        <td style="text-align:center;padding:8px;font-weight:bold;color:#00d9ff;">${combinedScores.lighting}</td>
-                    </tr>
-                </table>
-            </div>
-            
-            <div style="background:rgba(255,193,7,0.1);padding:15px;border-radius:10px;border-left:4px solid #ffc107;">
-                <h4 style="margin:0 0 10px 0;color:#ffc107;">💡 Rekomendasi</h4>
-                <p style="margin:0;font-size:14px;line-height:1.6;">${recommendation}</p>
-            </div>
-            
-            <div style="margin-top:20px;padding:15px;background:rgba(0,0,0,0.3);border-radius:10px;text-align:center;">
-                <div style="font-size:12px;color:#aaa;margin-bottom:10px;">Grade Category</div>
-                <div style="font-size:32px;font-weight:bold;color:#00d9ff;margin-bottom:5px;">${grade.label}</div>
-                <div style="font-size:14px;color:#fff;">${grade.desc}</div>
-            </div>
-        `;
-        
-        // Insert report after card-info section
-        const cardInfo = document.getElementById('card-info');
-        cardInfo?.insertAdjacentElement('afterend', reportSection);
-        
-        // Scroll to report
-        reportSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    
-    showBackImage(src) {
-        const panel = document.querySelector('.result-image');
-        let backImg = document.getElementById('back-image');
-        if (!backImg) {
-            panel.insertAdjacentHTML('beforeend', `
-                <img id="back-image" style="margin-top:10px;max-width:45%;border-radius:8px;border:2px solid #00d9ff;">
-                <div id="back-label" style="font-size:12px;color:#aaa;margin-top:5px;">Sisi Belakang</div>
-            `);
-            backImg = document.getElementById('back-image');
-        }
-        backImg.src = src;
-    }
-    
-    showDetailBreakdown(front, back) {
-        const info = document.getElementById('card-info');
-        document.getElementById('score-breakdown')?.remove();
-        
-        const breakdown = document.createElement('div');
-        breakdown.id = 'score-breakdown';
-        breakdown.innerHTML = `
-            <div style="margin-top:15px;padding:15px;background:rgba(0,217,255,0.1);border-radius:8px;">
-                <h4 style="margin:0 0 10px 0;">📊 Detail Analisis</h4>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
-                    <div>
-                        <strong style="color:#00d9ff;">Sisi Depan</strong><br>
-                        Centering: ${front.centering}/10<br>
-                        Surface: ${front.surface}/10<br>
-                        Corners: ${front.corners}/10<br>
-                        Edges: ${front.edges}/10
-                    </div>
-                    <div>
-                        <strong style="color:#00d9ff;">Sisi Belakang</strong><br>
-                        Centering: ${back.centering}/10<br>
-                        Surface: ${back.surface}/10<br>
-                        Corners: ${back.corners}/10<br>
-                        Edges: ${back.edges}/10
-                    </div>
-                </div>
-            </div>
-        `;
-        info.insertAdjacentElement('afterbegin', breakdown);
-    }
-    
     loadImage(src) {
         return new Promise((resolve) => {
             const img = new Image();
             img.onload = () => resolve(img);
             img.src = src;
         });
-    }
-    
-    analyzeStable(img) {
-        const c = document.createElement('canvas');
-        const x = c.getContext('2d');
-        c.width = 500;
-        c.height = Math.floor(500 * img.height / img.width);
-        x.drawImage(img, 0, 0, c.width, c.height);
-        
-        const imageData = x.getImageData(0, 0, c.width, c.height);
-        const d = imageData.data;
-        
-        const blurred = this.simpleBlur(d, c.width, c.height);
-        
-        return {
-            centering: this.checkCentering(blurred, c.width, c.height),
-            surface: this.checkSurface(blurred, c.width, c.height),
-            corners: this.checkCorners(blurred, c.width, c.height),
-            edges: this.checkEdges(blurred, c.width, c.height),
-            lighting: this.checkLighting(blurred)
-        };
-    }
-    
-    simpleBlur(data, w, h) {
-        const output = new Uint8ClampedArray(data);
-        const r = 1;
-        for (let y = r; y < h - r; y++) {
-            for (let x = r; x < w - r; x++) {
-                let R = 0, G = 0, B = 0, cnt = 0;
-                for (let dy = -r; dy <= r; dy++) {
-                    for (let dx = -r; dx <= r; dx++) {
-                        const idx = ((y + dy) * w + (x + dx)) * 4;
-                        R += data[idx]; 
-                        G += data[idx+1]; 
-                        B += data[idx+2];
-                        cnt++;
-                    }
-                }
-                const idx = (y * w + x) * 4;
-                output[idx] = R/cnt; 
-                output[idx+1] = G/cnt; 
-                output[idx+2] = B/cnt;
-            }
-        }
-        return output;
     }
     
     checkCentering(d, w, h) {
@@ -544,8 +308,7 @@ class CardGrader {
         return Math.round(Math.max(0, 10 - (bright/count) * 8));
     }
     
-    checkLighting(d, w, h) {
-        // w and h are optional, used when called from step-by-step analysis
+    checkLighting(d) {
         const samples = [];
         const step = Math.max(1, Math.floor((d.length/4)/3000));
         
@@ -568,7 +331,6 @@ class CardGrader {
     
     calcGrade(s) {
         const sum = s.centering*0.20 + s.surface*0.30 + s.corners*0.30 + s.edges*0.10 + s.lighting*0.10;
-        
         if (sum >= 9.5) return {num: sum.toFixed(1), label: 'Gem Mint', desc: 'Kondisi sempurna!'};
         if (sum >= 9.0) return {num: sum.toFixed(1), label: 'Mint', desc: 'Sangat baik'};
         if (sum >= 8.0) return {num: sum.toFixed(1), label: 'NM-Mint', desc: 'Near Mint'};
@@ -585,6 +347,49 @@ class CardGrader {
             if (bar) bar.style.width = `${v*10}%`;
             if (val) val.textContent = v;
         }
+    }
+    
+    showBackImage(src) {
+        const panel = document.querySelector('.result-image');
+        let backImg = document.getElementById('back-image');
+        if (!backImg) {
+            panel.insertAdjacentHTML('beforeend', `
+                <img id="back-image" style="margin-top:10px;max-width:45%;border-radius:8px;border:2px solid #00d9ff;">
+                <div id="back-label" style="font-size:12px;color:#aaa;margin-top:5px;">Sisi Belakang</div>
+            `);
+            backImg = document.getElementById('back-image');
+        }
+        backImg.src = src;
+    }
+    
+    showDetailBreakdown(front, back) {
+        const info = document.getElementById('card-info');
+        document.getElementById('score-breakdown')?.remove();
+        
+        const breakdown = document.createElement('div');
+        breakdown.id = 'score-breakdown';
+        breakdown.innerHTML = `
+            <div style="margin-top:15px;padding:15px;background:rgba(0,217,255,0.1);border-radius:8px;">
+                <h4 style="margin:0 0 10px 0;">📊 Detail Analisis</h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
+                    <div>
+                        <strong style="color:#00d9ff;">Sisi Depan</strong><br>
+                        Centering: ${front.centering}/10<br>
+                        Surface: ${front.surface}/10<br>
+                        Corners: ${front.corners}/10<br>
+                        Edges: ${front.edges}/10
+                    </div>
+                    <div>
+                        <strong style="color:#00d9ff;">Sisi Belakang</strong><br>
+                        Centering: ${back.centering}/10<br>
+                        Surface: ${back.surface}/10<br>
+                        Corners: ${back.corners}/10<br>
+                        Edges: ${back.edges}/10
+                    </div>
+                </div>
+            </div>
+        `;
+        info.insertAdjacentElement('afterbegin', breakdown);
     }
     
     showCardSearch() {
@@ -666,7 +471,7 @@ class CardGrader {
         
         document.getElementById('card-search')?.remove();
         
-        // Update and show full report after card is selected
+        // Update and show report
         if (this.lastAnalysis) {
             this.updateFullReport(
                 this.lastAnalysis.frontScores, 
@@ -675,6 +480,40 @@ class CardGrader {
                 this.lastAnalysis.grade
             );
         }
+    }
+    
+    updateFullReport(frontScores, backScores, combinedScores, grade) {
+        const report = document.getElementById('full-report');
+        if (!report) return;
+        
+        const cardName = document.getElementById('card-name')?.textContent || 'Unknown Card';
+        const cardSet = document.getElementById('card-set')?.textContent || '-';
+        const cardRarity = document.getElementById('card-rarity')?.textContent || '-';
+        const timestamp = new Date().toLocaleString('id-ID');
+        
+        let recommendation = '';
+        if (combinedScores.corners < 6) recommendation += '• Sudut kartu perlu diperhatikan. ';
+        if (combinedScores.edges < 6) recommendation += '• Tepi kartu terlihat aus. ';
+        if (combinedScores.surface < 6) recommendation += '• Permukaan ada scratches. ';
+        if (combinedScores.centering < 7) recommendation += '• Centering kurang sempurna. ';
+        if (!recommendation) recommendation = '• Kartu dalam kondisi baik!';
+        
+        document.getElementById('report-front-img').src = this.frontImage;
+        document.getElementById('report-back-img').src = this.backImage;
+        document.getElementById('report-name').textContent = cardName;
+        document.getElementById('report-set').textContent = cardSet;
+        document.getElementById('report-rarity').textContent = cardRarity;
+        document.getElementById('report-date').textContent = timestamp;
+        document.getElementById('report-centering').textContent = combinedScores.centering;
+        document.getElementById('report-surface').textContent = combinedScores.surface;
+        document.getElementById('report-corners').textContent = combinedScores.corners;
+        document.getElementById('report-edges').textContent = combinedScores.edges;
+        document.getElementById('report-lighting').textContent = combinedScores.lighting;
+        document.getElementById('report-final').textContent = grade.num;
+        document.getElementById('report-recommendation').textContent = recommendation;
+        
+        report.classList.remove('hidden');
+        report.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     
     saveResult() {
