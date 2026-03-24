@@ -1,4 +1,4 @@
-// Pokemon Card AI Grader - STABLE Version
+// Pokemon Card AI Grader - Front & Back Implementation
 class CardGrader {
     constructor() {
         this.video = document.getElementById('camera-feed');
@@ -7,11 +7,15 @@ class CardGrader {
         this.stream = null;
         this.cameraReady = false;
         this.tcgData = null;
+        this.frontImage = null;
+        this.backImage = null;
+        this.currentStep = 'front';
         this.init();
     }
     
     async init() {
         this.setupEventListeners();
+        this.updateGuideText();
         try { await this.setupCamera(); } catch (e) {}
     }
     
@@ -37,7 +41,7 @@ class CardGrader {
     setupEventListeners() {
         document.getElementById('capture-btn')?.addEventListener('click', (e) => { 
             e.preventDefault(); 
-            this.captureAndGrade(); 
+            this.capture(); 
         });
         document.getElementById('gallery-btn')?.addEventListener('click', () => 
             document.getElementById('file-input')?.click()
@@ -45,62 +49,169 @@ class CardGrader {
         document.getElementById('file-input')?.addEventListener('change', (e) => { 
             if (e.target.files?.[0]) this.handleFile(e.target.files[0]); 
         });
-        document.getElementById('close-analysis')?.addEventListener('click', () => 
-            document.getElementById('analysis-panel')?.classList.add('hidden')
-        );
-        document.getElementById('retry-btn')?.addEventListener('click', () => 
-            document.getElementById('analysis-panel')?.classList.add('hidden')
-        );
+        document.getElementById('close-analysis')?.addEventListener('click', () => {
+            document.getElementById('analysis-panel')?.classList.add('hidden');
+            this.reset();
+        });
+        document.getElementById('retry-btn')?.addEventListener('click', () => {
+            document.getElementById('analysis-panel')?.classList.add('hidden');
+            this.reset();
+        });
         document.getElementById('save-btn')?.addEventListener('click', () => this.saveResult());
         document.getElementById('edit-card-btn')?.addEventListener('click', () => this.showCardSearch());
     }
     
-    captureAndGrade() {
+    updateGuideText() {
+        const guideText = document.querySelector('.guide-text');
+        const captureHint = document.querySelector('.capture-hint');
+        
+        if (this.currentStep === 'front') {
+            if (guideText) guideText.textContent = 'Posisikan SISI DEPAN kartu di area ini';
+            if (captureHint) captureHint.textContent = 'Tap untuk foto sisi depan';
+        } else if (this.currentStep === 'back') {
+            if (guideText) guideText.textContent = 'Posisikan SISI BELAKANG kartu di area ini';
+            if (captureHint) captureHint.textContent = 'Tap untuk foto sisi belakang';
+        }
+    }
+    
+    reset() {
+        this.currentStep = 'front';
+        this.frontImage = null;
+        this.backImage = null;
+        this.updateGuideText();
+    }
+    
+    capture() {
         if (!this.cameraReady) { 
             document.getElementById('file-input')?.click(); 
             return; 
         }
         this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
-        this.analyzeImage(this.canvas.toDataURL('image/jpeg'));
+        const imageData = this.canvas.toDataURL('image/jpeg');
+        
+        if (this.currentStep === 'front') {
+            this.frontImage = imageData;
+            this.currentStep = 'back';
+            this.updateGuideText();
+            alert('✅ Sisi depan tersimpan! Sekarang foto sisi belakang kartu.');
+        } else if (this.currentStep === 'back') {
+            this.backImage = imageData;
+            this.analyzeBoth();
+        }
     }
     
     handleFile(file) {
         if (!file.type.startsWith('image/')) return alert('Pilih file gambar');
         const reader = new FileReader();
-        reader.onload = (e) => this.analyzeImage(e.target.result);
+        reader.onload = (e) => {
+            if (this.currentStep === 'front') {
+                this.frontImage = e.target.result;
+                this.currentStep = 'back';
+                this.updateGuideText();
+                alert('✅ Sisi depan tersimpan! Sekarang upload sisi belakang.');
+            } else if (this.currentStep === 'back') {
+                this.backImage = e.target.result;
+                this.analyzeBoth();
+            }
+        };
         reader.readAsDataURL(file);
     }
     
-    async analyzeImage(src) {
+    async analyzeBoth() {
         const loading = document.getElementById('loading');
         loading?.classList.remove('hidden');
+        if (loading) loading.querySelector('p').textContent = 'Menganalisis sisi depan...';
         
-        const img = await new Promise(r => { 
-            const i = new Image(); 
-            i.onload = () => r(i); 
-            i.src = src; 
-        });
+        const frontImg = await this.loadImage(this.frontImage);
+        const frontScores = this.analyzeStable(frontImg);
         
-        document.getElementById('analyzed-image').src = src;
+        if (loading) loading.querySelector('p').textContent = 'Menganalisis sisi belakang...';
+        
+        const backImg = await this.loadImage(this.backImage);
+        const backScores = this.analyzeStable(backImg);
+        
+        const combinedScores = {
+            centering: Math.round((frontScores.centering * 0.6 + backScores.centering * 0.4)),
+            surface: Math.round((frontScores.surface * 0.6 + backScores.surface * 0.4)),
+            corners: Math.round((frontScores.corners * 0.5 + backScores.corners * 0.5)),
+            edges: Math.round((frontScores.edges * 0.5 + backScores.edges * 0.5)),
+            lighting: Math.round((frontScores.lighting + backScores.lighting) / 2)
+        };
+        
+        document.getElementById('analyzed-image').src = this.frontImage;
+        this.showBackImage(this.backImage);
+        
         document.getElementById('analysis-panel')?.classList.remove('hidden');
         document.getElementById('card-info')?.classList.remove('hidden');
         
-        // STABLE ANALYSIS
-        const scores = this.analyzeStable(img);
-        this.displayScores(scores);
+        this.displayScores(combinedScores);
         
-        const grade = this.calcGrade(scores);
+        const grade = this.calcGrade(combinedScores);
         document.querySelector('.grade-value').textContent = grade.num;
         document.getElementById('grade-desc').textContent = `${grade.label} - ${grade.desc}`;
         
+        this.showDetailBreakdown(frontScores, backScores);
         this.showCardSearch();
+        
         loading?.classList.add('hidden');
+        this.currentStep = 'front';
+        this.updateGuideText();
+    }
+    
+    showBackImage(src) {
+        const panel = document.querySelector('.result-image');
+        let backImg = document.getElementById('back-image');
+        if (!backImg) {
+            panel.insertAdjacentHTML('beforeend', `
+                <img id="back-image" style="margin-top:10px;max-width:45%;border-radius:8px;border:2px solid #00d9ff;">
+                <div id="back-label" style="font-size:12px;color:#aaa;margin-top:5px;">Sisi Belakang</div>
+            `);
+            backImg = document.getElementById('back-image');
+        }
+        backImg.src = src;
+    }
+    
+    showDetailBreakdown(front, back) {
+        const info = document.getElementById('card-info');
+        document.getElementById('score-breakdown')?.remove();
+        
+        const breakdown = document.createElement('div');
+        breakdown.id = 'score-breakdown';
+        breakdown.innerHTML = `
+            <div style="margin-top:15px;padding:15px;background:rgba(0,217,255,0.1);border-radius:8px;">
+                <h4 style="margin:0 0 10px 0;">📊 Detail Analisis</h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
+                    <div>
+                        <strong style="color:#00d9ff;">Sisi Depan</strong><br>
+                        Centering: ${front.centering}/10<br>
+                        Surface: ${front.surface}/10<br>
+                        Corners: ${front.corners}/10<br>
+                        Edges: ${front.edges}/10
+                    </div>
+                    <div>
+                        <strong style="color:#00d9ff;">Sisi Belakang</strong><br>
+                        Centering: ${back.centering}/10<br>
+                        Surface: ${back.surface}/10<br>
+                        Corners: ${back.corners}/10<br>
+                        Edges: ${back.edges}/10
+                    </div>
+                </div>
+            </div>
+        `;
+        info.insertAdjacentElement('afterbegin', breakdown);
+    }
+    
+    loadImage(src) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.src = src;
+        });
     }
     
     analyzeStable(img) {
         const c = document.createElement('canvas');
         const x = c.getContext('2d');
-        // Standarisasi ukuran
         c.width = 500;
         c.height = Math.floor(500 * img.height / img.width);
         x.drawImage(img, 0, 0, c.width, c.height);
@@ -108,7 +219,6 @@ class CardGrader {
         const imageData = x.getImageData(0, 0, c.width, c.height);
         const d = imageData.data;
         
-        // Blur untuk reduce noise
         const blurred = this.simpleBlur(d, c.width, c.height);
         
         return {
@@ -122,7 +232,7 @@ class CardGrader {
     
     simpleBlur(data, w, h) {
         const output = new Uint8ClampedArray(data);
-        const r = 1; // radius kecil
+        const r = 1;
         for (let y = r; y < h - r; y++) {
             for (let x = r; x < w - r; x++) {
                 let R = 0, G = 0, B = 0, cnt = 0;
@@ -163,16 +273,15 @@ class CardGrader {
         const rightAvg = rightSamples.reduce((a,b)=>a+b,0) / rightSamples.length;
         const diff = Math.abs(leftAvg - rightAvg) / 255;
         
-        // Tolerance lebih besar
         return Math.round(Math.max(0, Math.min(10, 10 - diff * 4)));
     }
     
     checkSurface(d, w, h) {
         const samples = [];
-        const margin = 0.15;
+        const m = 0.15;
         
-        for (let y = h * margin; y < h * (1-margin); y += 5) {
-            for (let x = w * margin; x < w * (1-margin); x += 5) {
+        for (let y = h * m; y < h * (1-m); y += 5) {
+            for (let x = w * m; x < w * (1-m); x += 5) {
                 const i = (Math.floor(y) * w + Math.floor(x)) * 4;
                 samples.push((d[i]+d[i+1]+d[i+2])/3);
             }
@@ -183,7 +292,6 @@ class CardGrader {
         const stdDev = Math.sqrt(variance) / 255;
         
         let score = 10;
-        // Tolerance lebih besar
         if (stdDev > 0.20) score -= (stdDev - 0.20) * 12;
         if (stdDev < 0.02) score -= 1;
         
@@ -205,7 +313,6 @@ class CardGrader {
                     count++;
                 }
             }
-            // Threshold lebih tinggi (>250) dan tolerance lebih besar
             total += Math.max(0, 10 - (bright/count) * 15);
         }
         return Math.round(total / 4);
@@ -215,12 +322,11 @@ class CardGrader {
         const ew = Math.floor(w * 0.05);
         let bright = 0, count = 0;
         
-        // Cek 4 sisi
         const edges = [
-            [ew, w-ew, 0, ew], // top
-            [ew, w-ew, h-ew, h], // bottom
-            [0, ew, ew, h-ew], // left
-            [w-ew, w, ew, h-ew] // right
+            [ew, w-ew, 0, ew],
+            [ew, w-ew, h-ew, h],
+            [0, ew, ew, h-ew],
+            [w-ew, w, ew, h-ew]
         ];
         
         for (const [x1, x2, y1, y2] of edges) {
@@ -257,7 +363,6 @@ class CardGrader {
     }
     
     calcGrade(s) {
-        // Weights: corners & surface paling penting
         const sum = s.centering*0.20 + s.surface*0.30 + s.corners*0.30 + s.edges*0.10 + s.lighting*0.10;
         
         if (sum >= 9.5) return {num: sum.toFixed(1), label: 'Gem Mint', desc: 'Kondisi sempurna!'};
