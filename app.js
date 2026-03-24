@@ -232,7 +232,16 @@ class CardGrader {
         // Store scores for report generation after card selection
         this.lastAnalysis = { frontScores, backScores, combinedScores, grade };
         
-        // Show card search first
+        // Reset card info first
+        document.getElementById('card-name').textContent = '--';
+        document.getElementById('card-set').textContent = '--';
+        document.getElementById('card-rarity').textContent = '--';
+        
+        // Remove old elements
+        document.getElementById('full-report')?.remove();
+        document.getElementById('card-search')?.remove();
+        
+        // Show card search
         this.showCardSearch();
         
         loading?.classList.add('hidden');
@@ -693,14 +702,16 @@ class CardGrader {
         
         document.getElementById('card-search')?.remove();
         
-        // Generate full report after card is selected
+        // Generate full report after card is selected (with delay for DOM update)
         if (this.lastAnalysis) {
-            this.generateFullReport(
-                this.lastAnalysis.frontScores, 
-                this.lastAnalysis.backScores, 
-                this.lastAnalysis.combinedScores, 
-                this.lastAnalysis.grade
-            );
+            setTimeout(() => {
+                this.generateFullReport(
+                    this.lastAnalysis.frontScores, 
+                    this.lastAnalysis.backScores, 
+                    this.lastAnalysis.combinedScores, 
+                    this.lastAnalysis.grade
+                );
+            }, 100);
         }
     }
     
